@@ -31,8 +31,47 @@ class GPTConfig:
 class GPT1Config(GPTConfig):
     """ GPT-1 like network roughly 125M params """
     n_layer = 12
-    n_head = 12
     n_embd = 768
+    n_head = 12
+
+# The setting is from paper, see slides:
+# https://docs.google.com/presentation/d/1Uq87bAUv5UoKwc49avuPiA4kkXFC4ttZmPFYcOJDnaQ/edit#slide=id.g1235cf120b8_0_71
+class GPT3SmallConfig(GPTConfig):
+    """ GPT-3   params """
+    n_layer = 12
+    n_embd = 768
+    n_head = 12
+    # so, d_head = 768/12 = 64
+
+class GPT3MediumConfig(GPTConfig):
+    """ GPT-3: 302,575,616 params """
+    n_layer = 24
+    n_embd = 1024
+    n_head = 16
+    # so, d_head = 768/12 = 64
+
+class GPT3LargeConfig(GPTConfig):
+    """ GPT-3: 680,355,840 params, 3792MiB """
+    n_layer = 24
+    n_embd = 1536
+    n_head = 16
+    # so, d_head = 768/12 = 96
+
+
+class GPT3XLConfig(GPTConfig):
+    """ GPT-3: 1,209,131,008 params, 5712MiB """
+    n_layer = 24
+    n_embd = 2048
+    n_head = 16
+    # so, d_head = 768/12 = 128
+
+class GPT3_2dot7B_Config(GPTConfig):
+    """ GPT-3 has 2,518,312,960 params, 10854MiB """
+    n_layer = 32
+    n_embd = 2560
+    n_head = 32
+    # so, d_head = 768/12 = 80
+
 
 class CausalSelfAttention(nn.Module):
     """
@@ -180,7 +219,7 @@ class GPT(nn.Module):
         return optimizer
 
     def forward(self, idx, targets=None):
-        b, t = idx.size()
+        b, t = idx.size() # b, t meaning: https://docs.google.com/presentation/d/1SGeL6FpTmMrPx6io5qjOI4IAF5PpwJMy796UBMVa68Q/edit#slide=id.g1237b006913_0_3
         assert t <= self.block_size, "Cannot forward, model block size is exhausted."
 
         # forward the GPT model
