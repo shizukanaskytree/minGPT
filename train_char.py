@@ -9,10 +9,10 @@
 # feed it some Shakespeare, which we'll get it to predict
 # character-level.
 
-# import debugpy
-# debugpy.listen(5678)
-# debugpy.wait_for_client()
-# debugpy.breakpoint()
+import debugpy
+debugpy.listen(5678)
+debugpy.wait_for_client()
+debugpy.breakpoint()
 
 # set up logging
 import logging
@@ -48,7 +48,7 @@ class CharDataset(Dataset):
         self.block_size = block_size
         self.vocab_size = vocab_size
         self.data = data
-    
+
     def __len__(self):
         return len(self.data) - self.block_size
 
@@ -102,11 +102,11 @@ train_dataset = CharDataset(text, block_size) # one line of poem is roughly 50 c
 
 from mingpt.model import GPT, GPTConfig, GPT3MediumConfig
 
-# mconf = GPTConfig(train_dataset.vocab_size, train_dataset.block_size,
-#                   n_layer=8, n_head=8, n_embd=512)
-mconf = GPT3MediumConfig(train_dataset.vocab_size, train_dataset.block_size)
+mconf = GPTConfig(train_dataset.vocab_size, train_dataset.block_size,
+                  n_layer=8, n_head=8, n_embd=512)
+# mconf = GPT3MediumConfig(train_dataset.vocab_size, train_dataset.block_size)
 model = GPT(mconf)
-model.to(torch.device('cuda:0'))
+# model.to(torch.device('cuda:0'))
 
 n_paraams = sum(p.numel() for p in model.parameters() if p.requires_grad)
 logger.info(f"GPT has {n_paraams} params")

@@ -61,6 +61,7 @@ class Trainer:
         model, config = self.model, self.config
         raw_model = model.module if hasattr(self.model, "module") else model
         optimizer = raw_model.configure_optimizers(config)
+        logger.info(f'optimizer is {optimizer}')
 
         def run_epoch(loader, is_train):
             model.train(is_train)
@@ -121,6 +122,7 @@ class Trainer:
             batch_size=config.batch_size,
             num_workers=config.num_workers
         )
+
         if self.test_dataset is not None:
             test_loader = DataLoader(
                 self.test_dataset,
