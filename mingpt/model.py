@@ -9,69 +9,13 @@ GPT model:
 
 import math
 import logging
+from decimal import Decimal
 
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
 logger = logging.getLogger(__name__)
-
-class GPTConfig:
-    """ base GPT config, params common to all GPT versions """
-    embd_pdrop = 0.1
-    resid_pdrop = 0.1
-    attn_pdrop = 0.1
-
-    def __init__(self, vocab_size, block_size, **kwargs):
-        self.vocab_size = vocab_size
-        self.block_size = block_size
-        for k,v in kwargs.items():
-            setattr(self, k, v)
-
-class GPT1Config(GPTConfig):
-    """ GPT-1 like network roughly 125M params """
-    n_layer = 12
-    n_embd = 768
-    n_head = 12
-
-# The setting is from paper, see slides:
-# https://docs.google.com/presentation/d/1Uq87bAUv5UoKwc49avuPiA4kkXFC4ttZmPFYcOJDnaQ/edit#slide=id.g1235cf120b8_0_71
-class GPT3SmallConfig(GPTConfig):
-    """ GPT-3   params """
-    n_layer = 12
-    n_embd = 768
-    n_head = 12
-    # so, d_head = 768/12 = 64
-
-class GPT3MediumConfig(GPTConfig):
-    """ GPT-3: 302,575,616 params """
-    n_layer = 24
-    n_embd = 1024
-    n_head = 16
-    # so, d_head = 768/12 = 64
-
-class GPT3LargeConfig(GPTConfig):
-    """ GPT-3: 680,355,840 params, 3792MiB """
-    n_layer = 24
-    n_embd = 1536
-    n_head = 16
-    # so, d_head = 768/12 = 96
-
-
-class GPT3XLConfig(GPTConfig):
-    """ GPT-3: 1,209,131,008 params, 5712MiB """
-    n_layer = 24
-    n_embd = 2048
-    n_head = 16
-    # so, d_head = 768/12 = 128
-
-class GPT3_2dot7B_Config(GPTConfig):
-    """ GPT-3 has 2,518,312,960 params, 10854MiB """
-    n_layer = 32
-    n_embd = 2560
-    n_head = 32
-    # so, d_head = 768/12 = 80
-
 
 class CausalSelfAttention(nn.Module):
     """
@@ -131,6 +75,17 @@ class Block(nn.Module):
             nn.Linear(4 * config.n_embd, config.n_embd),
             nn.Dropout(config.resid_pdrop),
         )
+        def n_params(model):
+            return sum(p.numel() for p in model.parameters())
+        n_params_ln1 = n_params(self.ln1)
+        n_params_ln2 = n_params(self.ln2)
+        n_params_attn = n_params(self.attn)
+        n_params_mlp = n_params(self.mlp)
+        logger.info(f"\n Block: \
+            n_params_attn: {Decimal(n_params_attn)} \n \
+            n_params_mlp: {Decimal(n_params_mlp)} \n \
+            n_params_ln1: {Decimal(n_params_ln1)} \n \
+            n_params_ln2: {Decimal(n_params_ln2)}")
 
     def forward(self, x):
         x = x + self.attn(self.ln1(x))
@@ -156,7 +111,29 @@ class GPT(nn.Module):
         self.block_size = config.block_size
         self.apply(self._init_weights)
 
-        logger.info("number of parameters: %e", sum(p.numel() for p in self.parameters()))
+        def n_params(model):
+            return sum(p.numel() for p in model.parameters())
+        def n_pos_emb(model):
+            return model.numel()
+
+        n_params_gpt = n_params(self)
+        logger.info("number of parameters: %e", n_params_gpt)
+
+        n_params_per_4gpus = n_params_gpt // 4
+
+        n_params_tok_emb = n_params(self.tok_emb)
+        n_params_pos_emb = n_pos_emb(self.pos_emb)
+        n_params_blocks = n_params(self.blocks)
+        n_params_per_block = n_params_blocks // config.n_layer
+        n_params_ln_f = n_params(self.ln_f)
+        n_params_head = n_params(self.head)
+        logger.info(f"\nper gpu: {Decimal(n_params_per_4gpus)} \n \
+            n_params_tok_emb: {Decimal(n_params_tok_emb)} \n \
+            n_params_pos_emb: {Decimal(n_params_pos_emb)} \n \
+            n_params_blocks: {Decimal(n_params_blocks)} \n \
+            n_params_per_block: {Decimal(n_params_per_block)} \n \
+            n_params_ln_f: {Decimal(n_params_ln_f)}\n \
+            n_params_head: {Decimal(n_params_head)}")
 
     def get_block_size(self):
         return self.block_size

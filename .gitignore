@@ -1,3 +1,4 @@
 .ipynb_checkpoints/
 __pycache__/
 *.swp
+train_pile/trainer_stderr.log

@@ -1,10 +1,10 @@
 import sys
 sys.path.append('/home/wxf/minigpt_prj/minGPT')
 
-# import debugpy
-# debugpy.listen(5678)
-# debugpy.wait_for_client()
-# debugpy.breakpoint()
+import debugpy
+debugpy.listen(5678)
+debugpy.wait_for_client()
+debugpy.breakpoint()
 
 import torch
 from transformers import DataCollatorForLanguageModeling, HfArgumentParser, GPT2TokenizerFast, TrainingArguments
@@ -13,7 +13,8 @@ from trainer_dataset import TrainDataset
 import time
 import math
 
-from mingpt.model import GPT, GPTConfig, GPT3SmallConfig, GPT3MediumConfig
+from mingpt.model import GPT
+from mingpt.config import *
 from mingpt.trainer import Trainer, TrainerConfig
 
 from mingpt.logging import get_logger, use_src_log_handler
@@ -40,7 +41,7 @@ if __name__ == '__main__':
     ################################################################################
     block_size = 2048 # why 512 is wrong?
     ### tokenizer.vocab_size+1 adjust for pile dataset
-    mconf = GPT3SmallConfig(tokenizer.vocab_size+1, block_size=block_size)
+    mconf = GPT3SimulteConfig(tokenizer.vocab_size+1, block_size=block_size)
 
     # signature_validator = RSASignatureValidator()
     dataset = get_pile_dataset()
@@ -103,13 +104,18 @@ if __name__ == '__main__':
         logger.info(f'step: {step} starts')
         start = time.time()
         input_ids = inputs["input_ids"]
-        logger.info(f"{input_ids.shape}")
+        # logger.info(f"{input_ids.shape}")
 
         input_ids = input_ids.to(device)
 
         ### prepare input and label for the model
         shift_input_ids = input_ids[..., :-1].contiguous()
         shift_labels = input_ids[..., 1:].contiguous()
+
+        # shift_input_ids.shape
+        # torch.Size([1, 2048])
+        # shift_labels.shape
+        # torch.Size([1, 2048])
 
         ### forward the model
         with torch.set_grad_enabled(is_train):
