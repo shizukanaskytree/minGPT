@@ -111,6 +111,14 @@ Papers + some implementation notes:
 - iGPT-S lr 0.003
 - No dropout is used.
 
+
+## notion
+
+https://www.notion.so/xiaofengwu/mini-GPT-1-page-2-level-803561d4328449cab4efcba3cd7423c7 
+
+## slides
+
 ### License
 
 MIT
+
