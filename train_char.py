@@ -100,7 +100,8 @@ block_size = 128 # spatial extent of the model for its context
 text = open('input.txt', 'r').read() # don't worry we won't run out of file handles
 train_dataset = CharDataset(text, block_size) # one line of poem is roughly 50 characters
 
-from mingpt.model import GPT, GPTConfig, GPT3MediumConfig
+from mingpt.model import GPT
+from mingpt.config import GPTConfig, GPT3MediumConfig
 
 mconf = GPTConfig(train_dataset.vocab_size, train_dataset.block_size,
                   n_layer=8, n_head=8, n_embd=512)

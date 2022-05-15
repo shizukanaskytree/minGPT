@@ -14,6 +14,7 @@ from decimal import Decimal
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
+from torch_optimizer import Lamb
 
 logger = logging.getLogger(__name__)
 
@@ -81,16 +82,30 @@ class Block(nn.Module):
         n_params_ln2 = n_params(self.ln2)
         n_params_attn = n_params(self.attn)
         n_params_mlp = n_params(self.mlp)
-        logger.info(f"\n Block: \
-            n_params_attn: {Decimal(n_params_attn)} \n \
-            n_params_mlp: {Decimal(n_params_mlp)} \n \
-            n_params_ln1: {Decimal(n_params_ln1)} \n \
-            n_params_ln2: {Decimal(n_params_ln2)}")
+        # logger.info(f"\n Block: \
+        #     n_params_attn: {Decimal(n_params_attn)} \n \
+        #     n_params_mlp: {Decimal(n_params_mlp)} \n \
+        #     n_params_ln1: {Decimal(n_params_ln1)} \n \
+        #     n_params_ln2: {Decimal(n_params_ln2)}")
 
     def forward(self, x):
         x = x + self.attn(self.ln1(x))
         x = x + self.mlp(self.ln2(x))
         return x
+
+
+class LambWithGradientClipping(Lamb):
+    """A version of LAMB that clips gradients based on their norm."""
+
+    def __init__(self, *args, max_grad_norm: float, **kwargs):
+        self.max_grad_norm = max_grad_norm
+        super().__init__(*args, **kwargs)
+
+    def step(self, *args, **kwargs):
+        iter_params = (param for group in self.param_groups for param in group["params"])
+        torch.nn.utils.clip_grad_norm_(iter_params, self.max_grad_norm)
+        return super().step(*args, **kwargs)
+
 
 class GPT(nn.Module):
     """  the full GPT language model, with a context size of block_size """
@@ -127,13 +142,13 @@ class GPT(nn.Module):
         n_params_per_block = n_params_blocks // config.n_layer
         n_params_ln_f = n_params(self.ln_f)
         n_params_head = n_params(self.head)
-        logger.info(f"\nper gpu: {Decimal(n_params_per_4gpus)} \n \
-            n_params_tok_emb: {Decimal(n_params_tok_emb)} \n \
-            n_params_pos_emb: {Decimal(n_params_pos_emb)} \n \
-            n_params_blocks: {Decimal(n_params_blocks)} \n \
-            n_params_per_block: {Decimal(n_params_per_block)} \n \
-            n_params_ln_f: {Decimal(n_params_ln_f)}\n \
-            n_params_head: {Decimal(n_params_head)}")
+        # logger.info(f"\nper gpu: {Decimal(n_params_per_4gpus)} \n \
+        #     n_params_tok_emb: {Decimal(n_params_tok_emb)} \n \
+        #     n_params_pos_emb: {Decimal(n_params_pos_emb)} \n \
+        #     n_params_blocks: {Decimal(n_params_blocks)} \n \
+        #     n_params_per_block: {Decimal(n_params_per_block)} \n \
+        #     n_params_ln_f: {Decimal(n_params_ln_f)}\n \
+        #     n_params_head: {Decimal(n_params_head)}")
 
     def get_block_size(self):
         return self.block_size
@@ -155,6 +170,8 @@ class GPT(nn.Module):
         We are separating out all parameters of the model into two buckets: those that will experience
         weight decay for regularization and those that won't (biases, and layernorm/embedding weights).
         We are then returning the PyTorch optimizer object.
+
+        pass: 2022-04-24 15:02:13
         """
 
         # separate out all parameters to those that will and won't experience regularizing weight decay
@@ -194,6 +211,115 @@ class GPT(nn.Module):
         ]
         optimizer = torch.optim.AdamW(optim_groups, lr=train_config.learning_rate, betas=train_config.betas)
         return optimizer
+
+
+    def config_lamb_optim(self):
+        """
+        This long function is unfortunately doing something very simple and is being very defensive:
+        We are separating out all parameters of the model into two buckets: those that will experience
+        weight decay for regularization and those that won't (biases, and layernorm/embedding weights).
+        We are then returning the PyTorch optimizer object.
+        """
+        optim_kwargs = dict(
+            lr=6e-4, # lr=0.0035355339059327377,
+            betas=(0.9, 0.999),
+            eps=1e-6,
+            weight_decay=0.01,
+            max_grad_norm=1,
+            clamp_value=10000.0,
+            debias=True,
+        )
+
+        #############################################################
+        # separate out all parameters to those that will and won't experience regularizing weight decay
+        #############################################################
+        decay = set()
+        no_decay = set()
+        whitelist_weight_modules = (torch.nn.Linear, )
+        blacklist_weight_modules = (torch.nn.LayerNorm, torch.nn.Embedding)
+        for mn, m in self.named_modules():
+            for pn, p in m.named_parameters():
+                fpn = '%s.%s' % (mn, pn) if mn else pn # full param name
+
+                if pn.endswith('bias'):
+                    # all biases will not be decayed
+                    no_decay.add(fpn)
+                elif pn.endswith('weight') and isinstance(m, whitelist_weight_modules):
+                    # weights of whitelist modules will be weight decayed
+                    decay.add(fpn)
+                elif pn.endswith('weight') and isinstance(m, blacklist_weight_modules):
+                    # weights of blacklist modules will NOT be weight decayed
+                    no_decay.add(fpn)
+
+        # special case the position embedding parameter in the root GPT module as not decayed
+        no_decay.add('pos_emb')
+
+        # validate that we considered every parameter
+        param_dict = {pn: p for pn, p in self.named_parameters()}
+        inter_params = decay & no_decay
+        union_params = decay | no_decay
+        assert len(inter_params) == 0, "parameters %s made it into both decay/no_decay sets!" % (str(inter_params), )
+        assert len(param_dict.keys() - union_params) == 0, "parameters %s were not separated into either decay/no_decay set!" \
+                                                    % (str(param_dict.keys() - union_params), )
+
+        # create the pytorch optimizer object
+        optim_groups = [
+            {"params": [param_dict[pn] for pn in sorted(list(decay))], "weight_decay": optim_kwargs["weight_decay"]},
+            {"params": [param_dict[pn] for pn in sorted(list(no_decay))], "weight_decay": 0.0},
+        ]
+        #############################################################
+
+        optim = LambWithGradientClipping(
+            optim_groups,
+            **optim_kwargs
+        )
+        return optim
+
+    def config_adam_optim(self):
+        weight_decay = 0.01
+        #############################################################
+        # separate out all parameters to those that will and won't experience regularizing weight decay
+        #############################################################
+        decay = set()
+        no_decay = set()
+        whitelist_weight_modules = (torch.nn.Linear, )
+        blacklist_weight_modules = (torch.nn.LayerNorm, torch.nn.Embedding)
+        for mn, m in self.named_modules():
+            for pn, p in m.named_parameters():
+                fpn = '%s.%s' % (mn, pn) if mn else pn # full param name
+
+                if pn.endswith('bias'):
+                    # all biases will not be decayed
+                    no_decay.add(fpn)
+                elif pn.endswith('weight') and isinstance(m, whitelist_weight_modules):
+                    # weights of whitelist modules will be weight decayed
+                    decay.add(fpn)
+                elif pn.endswith('weight') and isinstance(m, blacklist_weight_modules):
+                    # weights of blacklist modules will NOT be weight decayed
+                    no_decay.add(fpn)
+
+        # special case the position embedding parameter in the root GPT module as not decayed
+        no_decay.add('pos_emb')
+
+        # validate that we considered every parameter
+        param_dict = {pn: p for pn, p in self.named_parameters()}
+        inter_params = decay & no_decay
+        union_params = decay | no_decay
+        assert len(inter_params) == 0, "parameters %s made it into both decay/no_decay sets!" % (str(inter_params), )
+        assert len(param_dict.keys() - union_params) == 0, "parameters %s were not separated into either decay/no_decay set!" \
+                                                    % (str(param_dict.keys() - union_params), )
+
+        # create the pytorch optimizer object
+        optim_groups = [
+            {"params": [param_dict[pn] for pn in sorted(list(decay))], "weight_decay": weight_decay},
+            {"params": [param_dict[pn] for pn in sorted(list(no_decay))], "weight_decay": 0.0},
+        ]
+        #############################################################
+        lr = 6e-14
+        optimizer = torch.optim.Adam(optim_groups, lr=lr, weight_decay=weight_decay)
+
+        return optimizer
+
 
     def forward(self, idx, targets=None):
         b, t = idx.size() # b, t meaning: https://docs.google.com/presentation/d/1SGeL6FpTmMrPx6io5qjOI4IAF5PpwJMy796UBMVa68Q/edit#slide=id.g1237b006913_0_3

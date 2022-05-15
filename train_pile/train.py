@@ -1,10 +1,10 @@
 import sys
 sys.path.append('/home/wxf/minigpt_prj/minGPT')
 
-import debugpy
-debugpy.listen(5678)
-debugpy.wait_for_client()
-debugpy.breakpoint()
+# import debugpy
+# debugpy.listen(5678)
+# debugpy.wait_for_client()
+# debugpy.breakpoint()
 
 import torch
 from transformers import DataCollatorForLanguageModeling, HfArgumentParser, GPT2TokenizerFast, TrainingArguments
@@ -21,10 +21,53 @@ from mingpt.logging import get_logger, use_src_log_handler
 use_src_log_handler("in_root_logger")
 logger = get_logger(__name__)
 
+from scheduler import get_linear_schedule_with_warmup
 
 if __name__ == '__main__':
     parser = HfArgumentParser((TrainingArguments))
     (training_args, ) = parser.parse_args_into_dataclasses()
+
+    ##############################################################################
+    ################################### model ####################################
+    ##############################################################################
+    SEQUENCE_LENGTH = 2048
+    mconf = GPTTestConfig(vocab_size=50304, block_size=SEQUENCE_LENGTH)
+    model = GPT(mconf)
+    n_paraams = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    logger.info(f"GPT has {n_paraams} params")
+
+    ##############################################################################
+    ################################ Trainer Config ##############################
+    ##############################################################################
+    # initialize a trainer instance and kick off training
+    tconf = TrainerConfig(
+        max_epochs=2,
+        batch_size=1,
+        learning_rate=6e-4,
+        lr_decay=True,
+        warmup_tokens=512*20,
+        # final_tokens=2*len(train_dataset)*block_size, # pile dataset has no len()
+        num_workers=4)
+    config = tconf
+
+    ##############################################################################
+    ################################### optimizer ################################
+    ##############################################################################
+    ### minigpt optimizer
+    optimizer = model.configure_optimizers(config)
+    # optimizer = model.config_lamb_optim()
+    # optimizer = model.config_adam_optim()
+
+    global_batch_size = 4096 # 1 sec 1 sample, too long
+
+    ### Megatron-LM: Training Multi-Billion Parameter Language Models Using Model Parallelism
+    ### https://arxiv.org/pdf/1909.08053.pdf
+    num_training_steps = 15000 # the global step. 300k steps total
+    num_warmup_steps = 0 # 3125    # the global warm up step, it takes a long time.
+
+    # scheduler = torch.optim.lr_scheduler.LambdaLR(
+    #     optimizer,
+    #     lambda step: 1 - step/num_training_steps)
 
     ################################################################################
     ################################### dataset ####################################
@@ -36,13 +79,10 @@ if __name__ == '__main__':
     tokens_to_add = 128 - (len(tokenizer) % 128)
     tokenizer.add_special_tokens({'additional_special_tokens': [f'〈special{i}〉' for i in range(tokens_to_add)]})
 
-    ################################################################################
-    ################################### Model Config ###############################
-    ################################################################################
     block_size = 2048 # why 512 is wrong?
     ### tokenizer.vocab_size+1 adjust for pile dataset
-    mconf = GPT3SimulteConfig(tokenizer.vocab_size+1, block_size=block_size)
-
+    # mconf = GPT3SimulteConfig(tokenizer.vocab_size+1, block_size=block_size)
+    # Make the setting the same as the swarm experiment.
     # signature_validator = RSASignatureValidator()
     dataset = get_pile_dataset()
 
@@ -56,41 +96,15 @@ if __name__ == '__main__':
         data_collator=collator)
     train_dataloader = train_dataset.get_train_dataloader()
 
-    ################################################################################
-    ################################### model ####################################
-    ################################################################################
-    model = GPT(mconf)
-    n_paraams = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    logger.info(f"GPT has {n_paraams} params")
-
-    ################################################################################
-    ################################### TrainerConfig ####################################
-    ################################################################################
-    # initialize a trainer instance and kick off training
-    tconf = TrainerConfig(
-        max_epochs=2,
-        batch_size=1,
-        learning_rate=6e-4,
-        lr_decay=True,
-        warmup_tokens=512*20,
-        # final_tokens=2*len(train_dataset)*block_size, # pile dataset has no len()
-        num_workers=4)
-    config = tconf
-
-    ################################################################################
+    ##############################################################################
     ################################### train ####################################
-    ################################################################################
+    ##############################################################################
     # take over whatever gpus are on the system
     device = 'cpu'
     if torch.cuda.is_available():
         device = torch.cuda.current_device()
         # self.model = torch.nn.DataParallel(self.model).to(self.device)
         model = model.to(device)
-
-    # optimizer
-    raw_model = model.module if hasattr(model, "module") else model
-    optimizer = raw_model.configure_optimizers(config)
-    # logger.info(f'optimizer is {optimizer}')
 
     tokens = 0 # counter used for learning rate decay
 
@@ -101,7 +115,7 @@ if __name__ == '__main__':
     losses = []
 
     for step, inputs in enumerate(train_dataloader):
-        logger.info(f'step: {step} starts')
+        # logger.info(f'step: {step} starts')
         start = time.time()
         input_ids = inputs["input_ids"]
         # logger.info(f"{input_ids.shape}")
@@ -124,11 +138,22 @@ if __name__ == '__main__':
             losses.append(loss.item())
 
             if is_train:
-                # backprop and update the parameters
-                model.zero_grad()
                 loss.backward()
-                torch.nn.utils.clip_grad_norm_(model.parameters(), config.grad_norm_clip)
-                optimizer.step()
+                if step % global_batch_size == 0:
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), config.grad_norm_clip)
+                    optimizer.step()
+                    # backprop and update the parameters
+                    # Zero gradients, perform a backward pass, and update the weights.
+                    # Before the backward pass, use the optimizer object to zero all of the
+                    # gradients for the variables it will update (which are the learnable
+                    # weights of the model). This is because by default, gradients are
+                    # accumulated in buffers( i.e, not overwritten) whenever .backward()
+                    # is called. Checkout docs of torch.autograd.backward for more details.
+                    optimizer.zero_grad()
+                    # scheduler.step() # change lr after a global step
+                    # report progress
+                    logger.info(f"{step} done, train loss {loss.item():.5f}")
+                    # logger.info(f"{step} done, train loss {loss.item():.5f}, {scheduler.get_lr()}")
 
                 # decay the learning rate based on our progress
                 if config.lr_decay:
@@ -145,10 +170,3 @@ if __name__ == '__main__':
                         param_group['lr'] = lr
                 else:
                     lr = config.learning_rate
-
-                # report progress
-                logger.info(f"{step} done, train loss {loss.item():.5f}. lr {lr:e}")
-
-        # todo: save model when loss decreases.
-
-

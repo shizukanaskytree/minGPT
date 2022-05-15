@@ -2,3 +2,4 @@
 __pycache__/
 *.swp
 train_pile/trainer_stderr.log
+*.log
