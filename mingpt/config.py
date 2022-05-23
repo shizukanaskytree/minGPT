@@ -142,6 +142,7 @@ class GPT3SimulteConfig(GPTConfig):
     """
 
 class GPTTestConfig(GPTConfig): # GPT3_6dot7B_Simulte_Config
-    n_layer = 12
-    n_embd = 768
-    n_head = 12
+    """ large """
+    n_layer = 24
+    n_embd = 1536
+    n_head = 16

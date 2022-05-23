@@ -1,10 +1,10 @@
 import sys
 sys.path.append('/home/wxf/minigpt_prj/minGPT')
 
-# import debugpy
-# debugpy.listen(5678)
-# debugpy.wait_for_client()
-# debugpy.breakpoint()
+import debugpy
+debugpy.listen(5678)
+debugpy.wait_for_client()
+debugpy.breakpoint()
 
 import torch
 from transformers import DataCollatorForLanguageModeling, HfArgumentParser, GPT2TokenizerFast, TrainingArguments

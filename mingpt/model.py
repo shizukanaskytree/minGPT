@@ -134,14 +134,13 @@ class GPT(nn.Module):
         n_params_gpt = n_params(self)
         logger.info("number of parameters: %e", n_params_gpt)
 
-        n_params_per_4gpus = n_params_gpt // 4
-
-        n_params_tok_emb = n_params(self.tok_emb)
-        n_params_pos_emb = n_pos_emb(self.pos_emb)
-        n_params_blocks = n_params(self.blocks)
-        n_params_per_block = n_params_blocks // config.n_layer
-        n_params_ln_f = n_params(self.ln_f)
-        n_params_head = n_params(self.head)
+        # n_params_per_4gpus = n_params_gpt // 4
+        # n_params_tok_emb = n_params(self.tok_emb)
+        # n_params_pos_emb = n_pos_emb(self.pos_emb)
+        # n_params_blocks = n_params(self.blocks)
+        # n_params_per_block = n_params_blocks // config.n_layer
+        # n_params_ln_f = n_params(self.ln_f)
+        # n_params_head = n_params(self.head)
         # logger.info(f"\nper gpu: {Decimal(n_params_per_4gpus)} \n \
         #     n_params_tok_emb: {Decimal(n_params_tok_emb)} \n \
         #     n_params_pos_emb: {Decimal(n_params_pos_emb)} \n \
@@ -209,7 +208,8 @@ class GPT(nn.Module):
             {"params": [param_dict[pn] for pn in sorted(list(decay))], "weight_decay": train_config.weight_decay},
             {"params": [param_dict[pn] for pn in sorted(list(no_decay))], "weight_decay": 0.0},
         ]
-        optimizer = torch.optim.AdamW(optim_groups, lr=train_config.learning_rate, betas=train_config.betas)
+        # optimizer = torch.optim.AdamW(optim_groups, lr=train_config.learning_rate, betas=train_config.betas)
+        optimizer = torch.optim.SGD(optim_groups, lr=train_config.learning_rate)
         return optimizer
 
 
