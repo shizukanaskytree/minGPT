@@ -209,7 +209,8 @@ class GPT(nn.Module):
             {"params": [param_dict[pn] for pn in sorted(list(no_decay))], "weight_decay": 0.0},
         ]
         # optimizer = torch.optim.AdamW(optim_groups, lr=train_config.learning_rate, betas=train_config.betas)
-        optimizer = torch.optim.SGD(optim_groups, lr=train_config.learning_rate)
+        # optimizer = torch.optim.SGD(optim_groups, lr=train_config.learning_rate, momentum=0.9, weight_decay=0.9)
+        optimizer = torch.optim.Adam(optim_groups, lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0.9)
         return optimizer
 
 

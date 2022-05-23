@@ -58,7 +58,7 @@ if __name__ == '__main__':
     # optimizer = model.config_lamb_optim()
     # optimizer = model.config_adam_optim()
 
-    global_batch_size = 4096 # 1 sec 1 sample, too long
+    global_batch_size = 1 # 4096 # 1 sec 1 sample, too long
 
     ### Megatron-LM: Training Multi-Billion Parameter Language Models Using Model Parallelism
     ### https://arxiv.org/pdf/1909.08053.pdf
@@ -115,7 +115,7 @@ if __name__ == '__main__':
     losses = []
 
     for step, inputs in enumerate(train_dataloader):
-        # logger.info(f'step: {step} starts')
+        logger.info(f'step: {step} starts')
         start = time.time()
         input_ids = inputs["input_ids"]
         # logger.info(f"{input_ids.shape}")
@@ -141,7 +141,9 @@ if __name__ == '__main__':
                 loss.backward()
                 if step % global_batch_size == 0:
                     torch.nn.utils.clip_grad_norm_(model.parameters(), config.grad_norm_clip)
+                    logger.info(f'optim step: {step} starts')
                     optimizer.step()
+                    logger.info(f'optim step: {step} done')
                     # backprop and update the parameters
                     # Zero gradients, perform a backward pass, and update the weights.
                     # Before the backward pass, use the optimizer object to zero all of the
@@ -170,3 +172,5 @@ if __name__ == '__main__':
                         param_group['lr'] = lr
                 else:
                     lr = config.learning_rate
+
+        logger.info(f'step: {step} done')
