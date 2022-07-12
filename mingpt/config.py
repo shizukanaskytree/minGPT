@@ -141,7 +141,7 @@ class GPT3SimulteConfig(GPTConfig):
     n_params_ln2: 24576
     """
 
-class GPTTestConfig(GPTConfig): # GPT3_6dot7B_Simulte_Config
+class GPTTestConfig(GPTConfig): # == GPT3LargeConfig
     """ large """
     n_layer = 24
     n_embd = 1536

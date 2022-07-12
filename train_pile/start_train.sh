@@ -6,7 +6,7 @@ echo "current script name: $(basename $BASH_SOURCE), path: $SCRIPT_DIR, repo pat
 # used to store logs
 mkdir -p ${SCRIPT_DIR}/tmp
 
-export CUDA_VISIBLE_DEVICES=-1 # cpu only, use case: to get cpu memory usage of optimizer
+# export CUDA_VISIBLE_DEVICES=-1 # cpu only, use case: to get cpu memory usage of optimizer
 python ${SCRIPT_DIR}/train.py \
 --per_device_train_batch_size 1 \
 --dataloader_num_workers 1 \
