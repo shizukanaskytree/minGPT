@@ -1,29 +1,32 @@
 import sys
 sys.path.append('/home/wxf/minigpt_prj/minGPT')
 
-import debugpy
-debugpy.listen(5678)
-debugpy.wait_for_client()
-# debugpy.breakpoint()
-
-import torch
-from transformers import DataCollatorForLanguageModeling, HfArgumentParser, GPT2TokenizerFast, TrainingArguments
-from pile_streaming import get_pile_dataset
-from trainer_dataset import TrainDataset
 import time
 import math
-
+#-------------------------------------------------------------------------------
+import torch
+from transformers import DataCollatorForLanguageModeling, HfArgumentParser, \
+    GPT2TokenizerFast, TrainingArguments
+from pile_streaming import get_pile_dataset
+from trainer_dataset import TrainDataset
+#-------------------------------------------------------------------------------
 from mingpt.model import GPT
 from mingpt.config import *
 from mingpt.trainer import Trainer, TrainerConfig
-
 from mingpt.logging import get_logger, use_src_log_handler
+from scheduler import get_linear_schedule_with_warmup
+#-------------------------------------------------------------------------------
+
 use_src_log_handler("in_root_logger")
 logger = get_logger(__name__)
 
-from scheduler import get_linear_schedule_with_warmup
+def main():
 
-if __name__ == '__main__':
+    ### profiling peak memory usage
+    ### https://pytorch.org/docs/stable/generated/torch.cuda.max_memory_allocated.html
+    torch.cuda.reset_peak_memory_stats()
+    base_mem = torch.cuda.memory_allocated()
+
     parser = HfArgumentParser((TrainingArguments))
     (training_args, ) = parser.parse_args_into_dataclasses()
 
@@ -31,7 +34,9 @@ if __name__ == '__main__':
     ################################### model ####################################
     ##############################################################################
     SEQUENCE_LENGTH = 2048
-    mconf = GPTTestConfig(vocab_size=50304, block_size=SEQUENCE_LENGTH)
+
+    ### GPT3_175B_Simulte_Config, GPT3_2dot7B_Simulte_Config
+    mconf = GPT3_175B_Simulte_Config(vocab_size=50304, block_size=SEQUENCE_LENGTH)
     model = GPT(mconf)
     n_paraams = sum(p.numel() for p in model.parameters() if p.requires_grad)
     logger.info(f"GPT has {n_paraams} params")
@@ -54,11 +59,10 @@ if __name__ == '__main__':
     ################################### optimizer ################################
     ##############################################################################
     ### minigpt optimizer
-    optimizer = model.configure_optimizers(config)
+    # optimizer = model.configure_optimizers(config)
     # optimizer = model.config_lamb_optim()
-    # optimizer = model.config_adam_optim()
 
-    global_batch_size = 1 # 4096 # 1 sec 1 sample, too long
+    global_batch_size = 4096 # 1 sec 1 sample, too long
 
     ### Megatron-LM: Training Multi-Billion Parameter Language Models Using Model Parallelism
     ### https://arxiv.org/pdf/1909.08053.pdf
@@ -139,38 +143,58 @@ if __name__ == '__main__':
 
             if is_train:
                 loss.backward()
-                if step % global_batch_size == 0:
-                    torch.nn.utils.clip_grad_norm_(model.parameters(), config.grad_norm_clip)
-                    logger.info(f'optim step: {step} starts')
-                    optimizer.step()
-                    logger.info(f'optim step: {step} done')
-                    # backprop and update the parameters
-                    # Zero gradients, perform a backward pass, and update the weights.
-                    # Before the backward pass, use the optimizer object to zero all of the
-                    # gradients for the variables it will update (which are the learnable
-                    # weights of the model). This is because by default, gradients are
-                    # accumulated in buffers( i.e, not overwritten) whenever .backward()
-                    # is called. Checkout docs of torch.autograd.backward for more details.
-                    optimizer.zero_grad()
-                    # scheduler.step() # change lr after a global step
-                    # report progress
-                    logger.info(f"{step} done, train loss {loss.item():.5f}")
-                    # logger.info(f"{step} done, train loss {loss.item():.5f}, {scheduler.get_lr()}")
 
-                # decay the learning rate based on our progress
-                if config.lr_decay:
-                    tokens += (shift_labels >= 0).sum() # number of tokens processed this step (i.e. label is not -100)
-                    if tokens < config.warmup_tokens:
-                        # linear warmup
-                        lr_mult = float(tokens) / float(max(1, config.warmup_tokens))
-                    else:
-                        # cosine learning rate decay
-                        progress = float(tokens - config.warmup_tokens) / float(max(1, config.final_tokens - config.warmup_tokens))
-                        lr_mult = max(0.1, 0.5 * (1.0 + math.cos(math.pi * progress)))
-                    lr = config.learning_rate * lr_mult
-                    for param_group in optimizer.param_groups:
-                        param_group['lr'] = lr
-                else:
-                    lr = config.learning_rate
+                # ### apply optimizer
+                # if step % global_batch_size == 0:
+                #     logger.info(f'optim step: {step} starts')
+                #     torch.nn.utils.clip_grad_norm_(model.parameters(), config.grad_norm_clip)
+                #     optimizer.step()
+                #     logger.info(f'optim step: {step} done')
+
+                #     # backprop and update the parameters
+                #     # Zero gradients, perform a backward pass, and update the weights.
+                #     # Before the backward pass, use the optimizer object to zero all of the
+                #     # gradients for the variables it will update (which are the learnable
+                #     # weights of the model). This is because by default, gradients are
+                #     # accumulated in buffers( i.e, not overwritten) whenever .backward()
+                #     # is called. Checkout docs of torch.autograd.backward for more details.
+                #     optimizer.zero_grad()
+
+                #     scheduler.step() # change lr after a global step
+                #     # report progress
+                #     logger.info(f"{step} done, train loss {loss.item():.5f}")
+                #     # logger.info(f"{step} done, train loss {loss.item():.5f}, {scheduler.get_lr()}")
+
+                # # decay the learning rate based on our progress
+                # if config.lr_decay:
+                #     tokens += (shift_labels >= 0).sum() # number of tokens processed this step (i.e. label is not -100)
+                #     if tokens < config.warmup_tokens:
+                #         # linear warmup
+                #         lr_mult = float(tokens) / float(max(1, config.warmup_tokens))
+                #     else:
+                #         # cosine learning rate decay
+                #         progress = float(tokens - config.warmup_tokens) / float(max(1, config.final_tokens - config.warmup_tokens))
+                #         lr_mult = max(0.1, 0.5 * (1.0 + math.cos(math.pi * progress)))
+                #     lr = config.learning_rate * lr_mult
+                #     for param_group in optimizer.param_groups:
+                #         param_group['lr'] = lr
+                # else:
+                #     lr = config.learning_rate
+
+                peak_usage = torch.cuda.max_memory_allocated()
+                train_mem_usage = (peak_usage - base_mem)/(1024**2)
+                print(f"step={step}, peak_usage={peak_usage:.2f} MiB, train_mem_usage={train_mem_usage:.2f} MiB")
 
         logger.info(f'step: {step} done')
+        break
+
+    print('Training done!')
+
+
+if __name__ == '__main__':
+    # import debugpy
+    # debugpy.listen(5678)
+    # debugpy.wait_for_client()
+    # # debugpy.breakpoint()
+
+    main()

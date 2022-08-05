@@ -51,7 +51,7 @@ def get_pile_dataset(seed=0):
 
     # pile = interleave_datasets(dsets)
 
-    data_files = "https://mystic.the-eye.eu/public/AI/pile/train/29.jsonl.zst"
+    data_files = "https://the-eye.eu/public/AI/pile/train/29.jsonl.zst"
     pile = load_dataset("json", data_files=data_files, streaming=True, split="train")
 
     shuffled_pile = pile.shuffle(buffer_size=100, seed=seed)

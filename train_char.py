@@ -9,10 +9,10 @@
 # feed it some Shakespeare, which we'll get it to predict
 # character-level.
 
-import debugpy
-debugpy.listen(5678)
-debugpy.wait_for_client()
-debugpy.breakpoint()
+# import debugpy
+# debugpy.listen(5678)
+# debugpy.wait_for_client()
+# debugpy.breakpoint()
 
 # set up logging
 import logging
