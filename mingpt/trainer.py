@@ -65,7 +65,9 @@ class Trainer:
             model.train(is_train)
 
             losses = []
-            pbar = tqdm(enumerate(loader), total=len(loader)) if is_train else enumerate(loader)
+            # pbar = tqdm(enumerate(loader), total=len(loader)) if is_train else enumerate(loader)
+            # for it, (x, y) in pbar:
+            pbar = enumerate(loader) if is_train else enumerate(loader)
             for it, (x, y) in pbar:
 
                 # place data on the correct device
@@ -103,7 +105,8 @@ class Trainer:
                         lr = config.learning_rate
 
                     # report progress
-                    pbar.set_description(f"epoch {epoch+1} iter {it}: train loss {loss.item():.5f}. lr {lr:e}")
+                    # pbar.set_description(f"epoch {epoch+1} iter {it}: train loss {loss.item():.5f}. lr {lr:e}")
+                    print(f"epoch {epoch+1} iter {it}: train loss {loss.item():.5f}. lr {lr:e}")
 
             if not is_train:
                 test_loss = float(np.mean(losses))
