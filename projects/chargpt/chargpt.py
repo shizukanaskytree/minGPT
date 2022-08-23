@@ -14,7 +14,7 @@ from mingpt.trainer import Trainer
 from mingpt.utils import set_seed, setup_logging, CfgNode as CN
 
 # -----------------------------------------------------------------------------
-
+### I guess the C here is for "config"
 def get_config():
 
     C = CN()

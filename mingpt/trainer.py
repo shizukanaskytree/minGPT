@@ -28,11 +28,14 @@ class Trainer:
         C.grad_norm_clip = 1.0
         return C
 
-    def __init__(self, config, model, train_dataset):
+    def __init__(self, config, model, train_dataloader):
         self.config = config
         self.model = model
         self.optimizer = None
-        self.train_dataset = train_dataset
+
+        # self.train_dataset = train_dataset
+        self.train_dataloader = train_dataloader
+
         self.callbacks = defaultdict(list)
 
         # determine the device we'll train on
@@ -64,33 +67,43 @@ class Trainer:
         # setup the optimizer
         self.optimizer = model.configure_optimizers(config)
 
-        # setup the dataloader
-        train_loader = DataLoader(
-            self.train_dataset,
-            sampler=torch.utils.data.RandomSampler(self.train_dataset, replacement=True, num_samples=int(1e10)),
-            shuffle=False,
-            pin_memory=True,
-            batch_size=config.batch_size,
-            num_workers=config.num_workers,
-        )
+        ### setup the dataloader
+        # train_loader = DataLoader(
+        #     self.train_dataset,
+        #     sampler=torch.utils.data.RandomSampler(self.train_dataset, replacement=True, num_samples=int(1e10)),
+        #     shuffle=False,
+        #     pin_memory=True,
+        #     batch_size=config.batch_size,
+        #     num_workers=config.num_workers,
+        # )
 
         model.train()
         self.iter_num = 0
         self.iter_time = time.time()
-        data_iter = iter(train_loader)
+        data_iter = iter(self.train_dataloader)
         while True:
 
             # fetch the next batch (x, y) and re-init iterator if needed
             try:
                 batch = next(data_iter)
             except StopIteration:
-                data_iter = iter(train_loader)
+                data_iter = iter(self.train_dataloader)
                 batch = next(data_iter)
-            batch = [t.to(self.device) for t in batch]
-            x, y = batch
+            input_ids = batch['input_ids']
+            # batch = [t.to(self.device) for t in input_ids]
+            # x, y = batch
+
+            input_ids = input_ids.to(self.device)
+
+
+            # print(f"x.shape: {x.shape}, y.shape: {y.shape}")
+            ### x.shape: torch.Size([64, 128]), y.shape: torch.Size([64, 128])
 
             # forward the model
-            logits, self.loss = model(x, y)
+            logits, self.loss = model(idx=input_ids, targets=input_ids)
+
+            # print(f"logits.shape: {logits.shape}, loss.shape: {self.loss.shape}")
+            ### logits.shape: torch.Size([64, 128, 65]), loss.shape: torch.Size([])
 
             # backprop and update the parameters
             model.zero_grad(set_to_none=True)
