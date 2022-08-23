@@ -83,10 +83,14 @@ class Trainer:
                 if is_train:
 
                     # backprop and update the parameters
-                    model.zero_grad()
                     loss.backward()
                     torch.nn.utils.clip_grad_norm_(model.parameters(), config.grad_norm_clip)
-                    optimizer.step()
+
+                    ### gradient accumulation step == 256
+                    if it%256 == 0:
+                        print("optim step at it:", it)
+                        optimizer.step()
+                        optimizer.zero_grad()
 
                     # decay the learning rate based on our progress
                     if config.lr_decay:
