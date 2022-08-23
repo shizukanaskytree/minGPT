@@ -81,26 +81,30 @@ class Trainer:
         self.iter_num = 0
         self.iter_time = time.time()
         data_iter = iter(self.train_dataloader)
-        while True:
+        # print(f"{len(data_iter)} batches in dataloader")
 
+        while True:
             # fetch the next batch (x, y) and re-init iterator if needed
             try:
                 batch = next(data_iter)
-            except StopIteration:
+            except:
                 data_iter = iter(self.train_dataloader)
                 batch = next(data_iter)
+
             input_ids = batch['input_ids']
+            labels = batch['labels']
             # batch = [t.to(self.device) for t in input_ids]
             # x, y = batch
 
             input_ids = input_ids.to(self.device)
+            labels = labels.to(self.device)
 
 
             # print(f"x.shape: {x.shape}, y.shape: {y.shape}")
             ### x.shape: torch.Size([64, 128]), y.shape: torch.Size([64, 128])
 
             # forward the model
-            logits, self.loss = model(idx=input_ids, targets=input_ids)
+            logits, self.loss = model(idx=input_ids, targets=labels)
 
             # print(f"logits.shape: {logits.shape}, loss.shape: {self.loss.shape}")
             ### logits.shape: torch.Size([64, 128, 65]), loss.shape: torch.Size([])

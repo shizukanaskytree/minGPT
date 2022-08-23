@@ -275,7 +275,26 @@ class GPT(nn.Module):
         # if we are given some desired targets also calculate the loss
         loss = None
         if targets is not None:
-            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1) ### 1. torch.Size([2048, 50304]) 2. torch.Size([2048])
+
+            ### https://github.com/huggingface/transformers/blob/main/src/transformers/models/gpt2/modeling_gpt2.py#L1085-L1094
+
+            # Shift so that tokens < n predict n
+            logits = logits[..., :-1, :].contiguous()
+            # print(f"logits shape: {logits.shape}")
+
+            targets = targets[..., 1:].contiguous()
+            # print(f"targets shape: {targets.shape}")
+
+            # logits.permute(0, 2, 1) shape: batch_size x n_embedding x input_ids_length
+            # label shape:                   batch_size x input_ids_length
+            # loss shape:                    batch_size x input_ids_length
+            # loss shape is not a scalar since F.cross_entropy with reduction='none'
+            # related to get outputs_schema, so we must use none here not mean.
+            # loss = F.cross_entropy(logits.permute(0, 2, 1), targets, reduction="mean")
+
+            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), reduction="mean")
+
+            # loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1) ### 1. torch.Size([2048, 50304]) 2. torch.Size([2048])
 
         return logits, loss
 

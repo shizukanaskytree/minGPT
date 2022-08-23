@@ -2,7 +2,7 @@ from collections import defaultdict
 
 import torch
 from datasets import load_dataset, interleave_datasets, disable_progress_bar, set_progress_bar_enabled
-from transformers import DataCollatorForLanguageModeling, GPT2TokenizerFast
+from transformers import DataCollatorForLanguageModeling, GPT2TokenizerFast, AlbertTokenizerFast
 from torch.utils.data import DataLoader, Dataset, RandomSampler, SequentialSampler
 
 from mingpt.trainer import Trainer
@@ -13,6 +13,8 @@ tokenizer = GPT2TokenizerFast.from_pretrained('gpt2')
 tokenizer.add_special_tokens({'pad_token': '<PAD>'})
 tokens_to_add = 128 - (len(tokenizer) % 128)
 tokenizer.add_special_tokens({'additional_special_tokens': [f'〈special{i}〉' for i in range(tokens_to_add)]})
+
+# tokenizer = AlbertTokenizerFast.from_pretrained("albert-large-v2")
 
 MAX_SEQ_LENGTH = 2048
 
@@ -64,7 +66,7 @@ if __name__ == '__main__':
     # training dataset
     #---------------------------------------------------------------------------
     train_dataset = get_wiki_train_dataset(seed=1)
-    collator = DataCollatorForLanguageModeling(tokenizer, mlm=False, pad_to_multiple_of=2048)
+    collator = DataCollatorForLanguageModeling(tokenizer, mlm=False, pad_to_multiple_of=MAX_SEQ_LENGTH)
 
     train_dataloader = DataLoader(
                 train_dataset,
@@ -79,6 +81,8 @@ if __name__ == '__main__':
     #---------------------------------------------------------------------------
     config_model = GPT.get_default_config()
     config_model.model_type = 'gpt2'
+    print(f"len(tokenizer) = {len(tokenizer)}")
+
     config_model.vocab_size = len(tokenizer)
     config_model.block_size = MAX_SEQ_LENGTH
     model = GPT(config_model)
