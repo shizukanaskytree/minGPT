@@ -29,7 +29,7 @@ def get_config():
 
     # model
     C.model = GPT.get_default_config()
-    C.model.model_type = 'gpt-mini'
+    C.model.model_type = 'gpt2'
 
     # trainer
     C.trainer = Trainer.get_default_config()
@@ -47,7 +47,7 @@ class CharDataset(Dataset):
     @staticmethod
     def get_default_config():
         C = CN()
-        C.block_size = 128
+        C.block_size = 2048 # 128
         return C
 
     def __init__(self, config, data):
