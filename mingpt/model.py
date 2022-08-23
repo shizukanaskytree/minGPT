@@ -292,7 +292,11 @@ class GPT(nn.Module):
             # related to get outputs_schema, so we must use none here not mean.
             # loss = F.cross_entropy(logits.permute(0, 2, 1), targets, reduction="mean")
 
-            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), reduction="mean")
+            ### ok:
+            # loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), reduction="mean")
+
+            ### testing: OK
+            loss = F.cross_entropy(logits.permute(0, 2, 1), targets, reduction="mean")
 
             # loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1) ### 1. torch.Size([2048, 50304]) 2. torch.Size([2048])
 

@@ -93,6 +93,9 @@ class Trainer:
 
             input_ids = batch['input_ids']
             labels = batch['labels']
+
+            ### todo: check what is label.
+            # assert labels[..., 1:] == input_ids[..., :-1]
             # batch = [t.to(self.device) for t in input_ids]
             # x, y = batch
 

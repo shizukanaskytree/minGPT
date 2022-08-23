@@ -70,7 +70,7 @@ if __name__ == '__main__':
 
     train_dataloader = DataLoader(
                 train_dataset,
-                batch_size=1,
+                batch_size=2,
                 collate_fn=collator,
                 num_workers=0, #self.args.dataloader_num_workers, # 1
                 pin_memory=True, # from args default.
