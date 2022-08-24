@@ -46,17 +46,37 @@ def examples_from_documents(documents, max_seq_length=MAX_SEQ_LENGTH):
 
 def get_wiki_train_dataset(seed):
     ### todo: change the var name
-    pile = load_dataset(
+    wiki = load_dataset(
                 "wikitext",
                 "wikitext-103-v1",
                 # cache_dir="./data/cache",
                 streaming=True,
                 split="train")
 
-    shuffled_wiki = pile.shuffle(buffer_size=100, seed=seed)
-    tokenized_wiki = shuffled_wiki.map(examples_from_documents, batched=True, batch_size=4)
+    # shuffled_wiki = wiki.shuffle(buffer_size=100, seed=seed)
+    tokenized_wiki = wiki.map(examples_from_documents, batched=True, batch_size=4)
     tokenized_wiki = tokenized_wiki.with_format('torch')
     return tokenized_wiki
+
+
+def get_pile_dataset(seed):
+    # shards = random.Random(seed).choices(range(11, 30), k=shards_to_choose)
+
+    # dsets = [
+    #     load_dataset("json", data_files=f"https://mystic.the-eye.eu/public/AI/pile/train/{shard:02}.jsonl.zst",
+    #                  streaming=True, split="train") for shard in shards
+    # ]
+
+    # pile = interleave_datasets(dsets)
+
+    data_files = "https://mystic.the-eye.eu/public/AI/pile/train/29.jsonl.zst"
+    pile = load_dataset("json", data_files=data_files, streaming=True, split="train")
+
+    shuffled_pile = pile.shuffle(buffer_size=100, seed=seed)
+    tokenized_pile = shuffled_pile.map(examples_from_documents, batched=True, batch_size=4)
+    tokenized_pile = tokenized_pile.with_format('torch')
+    return tokenized_pile
+
 
 
 if __name__ == '__main__':
@@ -66,6 +86,8 @@ if __name__ == '__main__':
     # training dataset
     #---------------------------------------------------------------------------
     train_dataset = get_wiki_train_dataset(seed=1)
+    # train_dataset = get_pile_dataset(seed=1)
+
     collator = DataCollatorForLanguageModeling(tokenizer, mlm=False, pad_to_multiple_of=MAX_SEQ_LENGTH)
 
     train_dataloader = DataLoader(
@@ -98,7 +120,7 @@ if __name__ == '__main__':
     #---------------------------------------------------------------------------
     def batch_end_callback(trainer):
 
-        if trainer.iter_num % 10 == 0:
+        if trainer.iter_num % 1 == 0:
             print(f"iter_dt {trainer.iter_dt * 1000:.2f}ms; iter {trainer.iter_num}: train loss {trainer.loss.item():.5f}")
 
         # if trainer.iter_num % 500 == 0:

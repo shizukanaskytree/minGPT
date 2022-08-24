@@ -22,10 +22,11 @@ class Trainer:
         # optimizer parameters
         C.max_iters = None
         C.batch_size = 64
-        C.learning_rate = 3e-4
+        C.learning_rate = 3e-6
         C.betas = (0.9, 0.95)
-        C.weight_decay = 0.1 # only applied on matmul weights
-        C.grad_norm_clip = 1.0
+        # C.weight_decay = 0.1 # only applied on matmul weights
+        C.weight_decay = 0.01 # only applied on matmul weights
+        C.grad_norm_clip = 10.0 ### original: 1.0
         return C
 
     def __init__(self, config, model, train_dataloader):
@@ -107,7 +108,7 @@ class Trainer:
             ### x.shape: torch.Size([64, 128]), y.shape: torch.Size([64, 128])
 
             # forward the model
-            logits, self.loss = model(idx=input_ids, targets=labels)
+            logits, self.loss = model(idx=input_ids, targets=input_ids)
 
             # print(f"logits.shape: {logits.shape}, loss.shape: {self.loss.shape}")
             ### logits.shape: torch.Size([64, 128, 65]), loss.shape: torch.Size([])
