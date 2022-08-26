@@ -84,6 +84,7 @@ class CharDataset(Dataset):
 # -----------------------------------------------------------------------------
 
 if __name__ == '__main__':
+    # import debugpy; debugpy.listen(5679); debugpy.wait_for_client()
 
     # get default config and overrides from the command line, if any
     config = get_config()

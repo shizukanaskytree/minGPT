@@ -3,3 +3,11 @@ __pycache__/
 *.swp
 .env
 .pylintrc
+minGPT.egg-info/dependency_links.txt
+minGPT.egg-info/PKG-INFO
+minGPT.egg-info/requires.txt
+minGPT.egg-info/SOURCES.txt
+minGPT.egg-info/top_level.txt
+projects/chargpt/out/chargpt/args.txt
+projects/chargpt/out/chargpt/config.json
+projects/chargpt/out/chargpt/model.pt
