@@ -16,6 +16,7 @@ from mingpt.utils import set_seed, setup_logging, CfgNode as CN
 # -----------------------------------------------------------------------------
 
 def get_config():
+    ### 这是我们手动修改参数的地方.
 
     C = CN()
 
@@ -26,14 +27,16 @@ def get_config():
 
     # data
     C.data = CharDataset.get_default_config()
+    C.data.block_size = 1024 # 2048
 
     # model
     C.model = GPT.get_default_config()
-    C.model.model_type = 'gpt-mini'
+    C.model.model_type = 'gpt2' # 'gpt2-medium' # 'gpt2' #'gpt-mini'
 
     # trainer
     C.trainer = Trainer.get_default_config()
-    C.trainer.learning_rate = 5e-4 # the model we're using is so small that we can go a bit faster
+    C.trainer.learning_rate = 1e-4 # the model we're using is so small that we can go a bit faster
+    C.trainer.weight_decay = 0.01
 
     return C
 
@@ -94,7 +97,11 @@ if __name__ == '__main__':
     set_seed(config.system.seed)
 
     # construct the training dataset
-    text = open('input.txt', 'r').read() # don't worry we won't run out of file handles
+    # text = open('input.txt', 'r').read() # don't worry we won't run out of file handles
+    # path = '/home/wxf/atom_prj/atom/one_server_hosts_all_submodules/dataset/corpus.raw.txt'
+    # all_wiki_path = "/home/wxf/gpt2_prj/gpt2_dataset_workspace/build/corpus.raw.txt"
+    path = '/home/wxf/gpt2_prj/gpt2_dataset_workspace/build/output/rawaa'
+    text = open(path, 'r').read() # don't worry we won't run out of file handles
     train_dataset = CharDataset(config.data, text)
 
     # construct the model

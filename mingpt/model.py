@@ -226,9 +226,9 @@ class GPT(nn.Module):
         whitelist_weight_modules = (torch.nn.Linear, )
         blacklist_weight_modules = (torch.nn.LayerNorm, torch.nn.Embedding)
         for mn, m in self.named_modules():
-            print(f"mn={mn}, m={m}, type={type(m)}")
+            # print(f"mn={mn}, m={m}, type={type(m)}")
             for pn, p in m.named_parameters():
-                print(f"pn={pn}, p={p.shape}")
+                # print(f"pn={pn}, p={p.shape}")
 
                 fpn = '%s.%s' % (mn, pn) if mn else pn # full param name
                 # random note: because named_modules and named_parameters are recursive
