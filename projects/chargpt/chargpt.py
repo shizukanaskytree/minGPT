@@ -87,7 +87,7 @@ class CharDataset(Dataset):
 # -----------------------------------------------------------------------------
 
 if __name__ == '__main__':
-    # import debugpy; debugpy.listen(5679); debugpy.wait_for_client()
+    # import debugpy; debugpy.listen(5679); debugpy.wait_for_client(); debugpy.breakpoint()
 
     # get default config and overrides from the command line, if any
     config = get_config()
@@ -100,8 +100,11 @@ if __name__ == '__main__':
     # text = open('input.txt', 'r').read() # don't worry we won't run out of file handles
     # path = '/home/wxf/atom_prj/atom/one_server_hosts_all_submodules/dataset/corpus.raw.txt'
     # all_wiki_path = "/home/wxf/gpt2_prj/gpt2_dataset_workspace/build/corpus.raw.txt"
+
+    # notion note: 1. loss 下降实验: https://www.notion.so/xiaofengwu/loss-is-decreasing-in-Atom-a7324551bce8470385e60ae1afe2ff79
+    # 2. 数据集下载: https://www.notion.so/xiaofengwu/download-dataset-process-dataset-training-loss-1be9fde4bfa64352bc8cb288e8927007
     path = '/home/wxf/gpt2_prj/gpt2_dataset_workspace/build/output/rawaa'
-    text = open(path, 'r').read() # don't worry we won't run out of file handles
+    text = open(path, 'r').read()
     train_dataset = CharDataset(config.data, text)
 
     # construct the model
